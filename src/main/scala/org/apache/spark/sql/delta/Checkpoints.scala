@@ -25,7 +25,8 @@ import org.apache.spark.sql.delta.actions.{Action, Metadata, SingleAction}
 import org.apache.spark.sql.delta.metering.DeltaLogging
 import org.apache.spark.sql.delta.storage.LogStore
 import org.apache.spark.sql.delta.util.DeltaFileOperations
-import org.apache.spark.sql.delta.util.FileNames._
+import org.apache.spark.sql.delta.LogFileMeta.isCheckpointFile
+import org.apache.spark.sql.delta.util.FileNames.{checkpointFileSingular, checkpointFileWithParts, checkpointPrefix, checkpointVersion, numCheckpointParts}
 import org.apache.spark.sql.delta.util.JsonUtils
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapred.{JobConf, TaskAttemptContextImpl, TaskAttemptID}
@@ -171,10 +172,10 @@ trait Checkpoints extends DeltaLogging {
   protected def findLastCompleteCheckpoint(cv: CheckpointInstance): Option[CheckpointInstance] = {
     var cur = math.max(cv.version, 0L)
     while (cur >= 0) {
-      val checkpoints = store.listFrom(checkpointPrefix(logPath, math.max(0, cur - 1000)))
-          .map(_.getPath)
+      val checkpointPrefixPath = checkpointPrefix(logPath, math.max(0, cur - 1000))
+      val checkpoints = logFileHandler.listFilesFrom(checkpointPrefixPath)
           .filter(isCheckpointFile)
-          .map(CheckpointInstance(_))
+          .map(_.asCheckpointInstance())
           .takeWhile(tv => (cur == 0 || tv.version <= cur) && tv.isEarlierThan(cv))
           .toArray
       val lastCheckpoint = getLatestCompleteCheckpointFromList(checkpoints, cv)
