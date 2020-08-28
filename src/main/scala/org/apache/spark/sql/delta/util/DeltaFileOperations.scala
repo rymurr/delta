@@ -32,6 +32,7 @@ import org.apache.parquet.hadoop.{Footer, ParquetFileReader}
 
 import org.apache.spark.{SparkEnv, TaskContext}
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.sql.delta.LogFileMetaParser
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.util.{SerializableConfiguration, ThreadUtils}
 
@@ -117,7 +118,7 @@ object DeltaFileOperations extends DeltaLogging {
 
   /** Iterate through the contents of directories. */
   private def listUsingLogStore(
-      logStore: LogStore,
+      logStore: LogFileMetaParser,
       subDirs: Iterator[String],
       recurse: Boolean,
       hiddenFileNameFilter: String => Boolean): Iterator[SerializableFileStatus] = {
@@ -125,9 +126,9 @@ object DeltaFileOperations extends DeltaLogging {
     def list(dir: String, tries: Int): Iterator[SerializableFileStatus] = {
       logInfo(s"Listing $dir")
       try {
-        logStore.listFrom(new Path(dir, "\u0000"))
-          .filterNot(f => hiddenFileNameFilter(f.getPath.getName))
-          .map(SerializableFileStatus.fromStatus)
+        logStore.listFilesFrom(new Path(dir, "\u0000"))
+          .filterNot(f => hiddenFileNameFilter(f.fileStatus.getPath.getName))
+          .map(f => SerializableFileStatus.fromStatus(f.fileStatus))
       } catch {
         case NonFatal(e) if isThrottlingError(e) && tries > 0 =>
           randomBackoff("listing", e)
@@ -151,7 +152,7 @@ object DeltaFileOperations extends DeltaLogging {
 
   /** Given an iterator of files and directories, recurse directories with its contents. */
   private def recurseDirectories(
-      logStore: LogStore,
+      logStore: LogFileMetaParser,
       filesAndDirs: Iterator[SerializableFileStatus],
       hiddenFileNameFilter: String => Boolean): Iterator[SerializableFileStatus] = {
     filesAndDirs.flatMap {
@@ -193,12 +194,14 @@ object DeltaFileOperations extends DeltaLogging {
     val listParallelism = fileListingParallelism.getOrElse(spark.sparkContext.defaultParallelism)
     val dirsAndFiles = spark.sparkContext.parallelize(subDirs).mapPartitions { dirs =>
       val logStore = LogStore(SparkEnv.get.conf, hadoopConf.value.value)
-      listUsingLogStore(logStore, dirs, recurse = false, hiddenFileNameFilter)
+      val logFileHandler = LogFileMetaParser(SparkEnv.get.conf, hadoopConf.value.value, logStore)
+      listUsingLogStore(logFileHandler, dirs, recurse = false, hiddenFileNameFilter)
     }.repartition(listParallelism) // Initial list of subDirs may be small
 
     val allDirsAndFiles = dirsAndFiles.mapPartitions { firstLevelDirsAndFiles =>
       val logStore = LogStore(SparkEnv.get.conf, hadoopConf.value.value)
-      recurseDirectories(logStore, firstLevelDirsAndFiles, hiddenFileNameFilter)
+      val logFileHandler = LogFileMetaParser(SparkEnv.get.conf, hadoopConf.value.value, logStore)
+      recurseDirectories(logFileHandler, firstLevelDirsAndFiles, hiddenFileNameFilter)
     }
     spark.createDataset(allDirsAndFiles)
   }
@@ -211,8 +214,11 @@ object DeltaFileOperations extends DeltaLogging {
       dirs: Seq[String],
       recursive: Boolean = true,
       fileFilter: String => Boolean = defaultHiddenFileFilter): Seq[SerializableFileStatus] = {
-    val logStore = LogStore(SparkEnv.get.conf, spark.sessionState.newHadoopConf)
-    listUsingLogStore(logStore, dirs.toIterator, recurse = recursive, fileFilter).toSeq
+    val hadoopConfig = spark.sessionState.newHadoopConf
+    val sparkConf = SparkEnv.get.conf
+    val logStore = LogStore(sparkConf, hadoopConfig)
+    val logFileHandler = LogFileMetaParser(sparkConf, hadoopConfig, logStore)
+    listUsingLogStore(logFileHandler, dirs.toIterator, recurse = recursive, fileFilter).toSeq
   }
 
   /**
