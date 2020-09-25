@@ -5,7 +5,6 @@ on:
     branches:
       - master
       - branch-0.6  
-  pull_request:
 
 jobs:
   java:
@@ -27,13 +26,12 @@ jobs:
           ~/.sbt
         key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
     - name: Build with sbt
-      run: sbt compile publishM2
+      run: sbt test publishM2
       env:
         GITHUB_TOKEN: ${{ github.token }} 
     - name: Push with maven
       run: |
         export VERSION=`cat version.sbt|awk '{print $5}'|sed 's/"//g'`
-        env
         cp /home/runner/.m2/repository/io/delta/delta-core_2.12/$VERSION/delta-core_2.12-$VERSION.* .
         mvn -B -X -e deploy:deploy-file -DpomFile=delta-core_2.12-$VERSION.pom -DrepositoryId=github -Dfile=delta-core_2.12-$VERSION.jar -Durl=https://maven.pkg.github.com/projectnessie/delta
       env:
