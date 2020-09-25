@@ -28,7 +28,7 @@ jobs:
         GITHUB_TOKEN: ${{ github.token }} 
     - name: Push with maven
       run: |
-        export VERSION=`cat version.sbt|awk '{print $5}'| sed 's/"//g"'`
+        export VERSION=`cat version.sbt|awk '{print $5}'|sed 's/"//g'`
         mvn deploy:deploy-file -DpomFile=~/.m2/repository/io/delta/delta-core_2.12/$VERSION/delta-core_2.12-$VERSION.pom -DrepositoryId=github -Dfile=~/.m2/repository/io/delta/delta-core_2.12/$VERSION/delta-core_2.12-$VERSION.jar -Durl=https://maven.pkg.github.com/projectnessie/delta
       env:
         GITHUB_TOKEN: ${{ github.token }} 
