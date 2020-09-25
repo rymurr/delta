@@ -34,7 +34,7 @@ jobs:
       run: |
         export VERSION=`cat version.sbt|awk '{print $5}'|sed 's/"//g'`
         cat /home/runner/.m2/settings.xml
-        mvn deploy:deploy-file -DpomFile=/home/runner/.m2/repository/io/delta/delta-core_2.12/$VERSION/delta-core_2.12-$VERSION.pom -DrepositoryId=github -Dfile=/home/runner/.m2/repository/io/delta/delta-core_2.12/$VERSION/delta-core_2.12-$VERSION.jar -Durl=https://maven.pkg.github.com/projectnessie/delta
+        mvn -B -X -e deploy:deploy-file -DpomFile=/home/runner/.m2/repository/io/delta/delta-core_2.12/$VERSION/delta-core_2.12-$VERSION.pom -DrepositoryId=github -Dfile=/home/runner/.m2/repository/io/delta/delta-core_2.12/$VERSION/delta-core_2.12-$VERSION.jar -Durl=https://maven.pkg.github.com/projectnessie/delta
       env:
         GITHUB_TOKEN: ${{ github.token }} 
 
