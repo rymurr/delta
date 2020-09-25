@@ -32,8 +32,9 @@ jobs:
     - name: Push with maven
       run: |
         export VERSION=`cat version.sbt|awk '{print $5}'|sed 's/"//g'`
+        # maven doesn't like pushing from local repository so we copy before pushing
         cp /home/runner/.m2/repository/io/delta/delta-core_2.12/$VERSION/delta-core_2.12-$VERSION.* .
-        mvn -B -X -e deploy:deploy-file -DpomFile=delta-core_2.12-$VERSION.pom -DrepositoryId=github -Dfile=delta-core_2.12-$VERSION.jar -Durl=https://maven.pkg.github.com/projectnessie/delta
+        mvn -B deploy:deploy-file -DpomFile=delta-core_2.12-$VERSION.pom -DrepositoryId=github -Dfile=delta-core_2.12-$VERSION.jar -Durl=https://maven.pkg.github.com/projectnessie/delta
       env:
         GITHUB_TOKEN: ${{ github.token }} 
 
