@@ -23,7 +23,7 @@ jobs:
           ~/.sbt
         key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
     - name: Build with sbt
-      run: sbt test publishM2
+      run: sbt compile publishM2
       env:
         GITHUB_TOKEN: ${{ github.token }} 
     - name: Push with maven
