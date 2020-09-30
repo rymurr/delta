@@ -109,7 +109,7 @@ trait SnapshotManagement { self: DeltaLog =>
       // If there is a new checkpoint, start new lineage there.
 
       val newCheckpointVersion = newCheckpoint.get.version
-      val newCheckpointPaths = newCheckpoint.get.getCorrespondingFiles(logPath).toSet
+      val newCheckpointCount = newCheckpoint.get.numParts.getOrElse(1)
 
       val deltasAfterCheckpoint = deltas.filter { file =>
         file.version > newCheckpointVersion
@@ -128,10 +128,10 @@ trait SnapshotManagement { self: DeltaLog =>
       }
       val newVersion = deltaVersions.lastOption.getOrElse(newCheckpoint.get.version)
       val newCheckpointFiles = checkpoints.filter(
-        f => newCheckpointPaths.contains(f.fileStatus.getPath))
-      assert(newCheckpointFiles.length == newCheckpointPaths.size,
+        f => f.version == newCheckpointVersion && f.numParts.getOrElse(1) == newCheckpointCount)
+      assert(newCheckpointFiles.length == newCheckpointCount,
         "Failed in getting the file information for:\n" +
-        newCheckpointPaths.mkString(" -", "\n -", "") + "\n" +
+        s"$newCheckpointVersion and $newCheckpointCount\n" +
         "among\n" + checkpoints.map(_.fileStatus.getPath).mkString(" -", "\n -", ""))
 
       // In the case where `deltasAfterCheckpoint` is empty, `deltas` should still not be empty,
